@@ -12,7 +12,6 @@ from muzero_model import *
 from replay_buffer import *
 
 
-
 ##########################################################################################################################
 
 # Create two function because the compute
@@ -24,7 +23,6 @@ def play_game_ray(environment=None,
                   monte_carlo_tree_search=None,
                   number_of_monte_carlo_tree_search_simulation=50,
                   temperature=1):
-
     environment = copy.deepcopy(environment)
     if environment.env.metadata['render_fps'] is None:
         environment.env.metadata['render_fps'] = 30
@@ -52,7 +50,6 @@ def play_game(environment=None,
               monte_carlo_tree_search=None,
               number_of_monte_carlo_tree_search_simulation=50,
               temperature=1):
-
     environment = copy.deepcopy(environment)
     if environment.env.metadata['render_fps'] is None:
         environment.env.metadata['render_fps'] = 30
@@ -75,6 +72,7 @@ def play_game(environment=None,
     environment.close()
     return environment
 
+
 ##########################################################################################################################
 
 
@@ -83,12 +81,12 @@ def scaler(x, newmin=0, newmax=1):
     oldmin, oldmax = min(x), max(x)
     oldrange = oldmax - oldmin
     newrange = newmax - newmin
-    if oldrange == 0:        # Deal with the case where rvalue is constant:
-        if oldmin < newmin:      # If rvalue < newmin, set all rvalue values to newmin
+    if oldrange == 0:  # Deal with the case where rvalue is constant:
+        if oldmin < newmin:  # If rvalue < newmin, set all rvalue values to newmin
             newval = newmin
-        elif oldmin > newmax:    # If rvalue > newmax, set all rvalue values to newmax
+        elif oldmin > newmax:  # If rvalue > newmax, set all rvalue values to newmax
             newval = newmax
-        else:                    # If newmin <= rvalue <= newmax, keep rvalue the same
+        else:  # If newmin <= rvalue <= newmax, keep rvalue the same
             newval = oldmin
         normal = [newval for _ in x]
     else:
@@ -96,28 +94,36 @@ def scaler(x, newmin=0, newmax=1):
         normal = [(v - oldmin) * scale + newmin for v in x]
     return np.array(normal)
 
+
 ##########################################################################################################################
 
 
-def temperature_scheduler(epoch=1, actual_epoch=1, mode = "static_temperature"):
+def temperature_scheduler(epoch=1, actual_epoch=1, mode="static_temperature"):
     # # # personal add
     # # # will scale the remperature to an opposite tanh distribution ( 1 - tanh )
     # # # of chosen bound ( look like cosineannealing for reference)
     if mode == "reversal_tanh_temperature":
-        array = np.array(list(range(1,epoch+1)))
+        array = np.array(list(range(1, epoch + 1)))
         index = np.where(array == actual_epoch)
-        range_scale_array = np.tanh(scaler(array,newmin=0.001,newmax=0.75))[index]
+        range_scale_array = np.tanh(scaler(array, newmin=0.001, newmax=0.75))[index]
         return (1 - range_scale_array) * 1.1
-    
+
     if mode == "extreme_temperature":
-        if actual_epoch < epoch * (100/700): return 3
-        elif actual_epoch < epoch * (200/700) : return 2
-        elif actual_epoch < epoch * (300/700) : return 1
-        elif actual_epoch < epoch * (400/700) : return .7
-        elif actual_epoch < epoch * (500/700) : return .5
-        elif actual_epoch < epoch * (600/700) : return .4
-        elif actual_epoch < epoch * 1: return .0625
-        
+        if actual_epoch < epoch * (100 / 700):
+            return 3
+        elif actual_epoch < epoch * (200 / 700):
+            return 2
+        elif actual_epoch < epoch * (300 / 700):
+            return 1
+        elif actual_epoch < epoch * (400 / 700):
+            return .7
+        elif actual_epoch < epoch * (500 / 700):
+            return .5
+        elif actual_epoch < epoch * (600 / 700):
+            return .4
+        elif actual_epoch < epoch * 1:
+            return .0625
+
     # # # https://arxiv.org/pdf/1911.08265.pdf [page: 13]
     # # # original temperature distrubtion of muzero
     # # # Temperature is find for choicing an action such as:
@@ -131,12 +137,13 @@ def temperature_scheduler(epoch=1, actual_epoch=1, mode = "static_temperature"):
             return 0.5
         else:
             return 0.2
-        
+
     if mode == "static_temperature":
         return 0.0
-    
+
     if mode == "static_one_temperature":
         return 1
+
 
 ##########################################################################################################################
 
@@ -147,7 +154,7 @@ def learning_cycle(number_of_iteration=10000,
                    number_of_mcts_simulation=11,
                    model_tag_number=124,
                    number_of_worker_selfplay=1,
-                   tempererature_type = "static_temperature",
+                   tempererature_type="static_temperature",
                    verbose=True,
                    muzero_model=None,
                    gameplay=None,
@@ -201,84 +208,84 @@ def learning_cycle(number_of_iteration=10000,
             monte_carlo_tree_search : (mcts.class)
             
             replay_buffer : (replay_buffer.class)
-    """    
+    """
 
     # try:
     # # # Training
     reward, cache_reward, epoch_pr, loss, cache_loss = [-float("inf")], [], [], [], []
-    if number_of_worker_selfplay in ["max", "all"] or number_of_worker_selfplay >= int(torch.multiprocessing.cpu_count()):
+    if number_of_worker_selfplay in ["max", "all"] or number_of_worker_selfplay >= int(
+            torch.multiprocessing.cpu_count()):
         number_of_worker_selfplay = int(torch.multiprocessing.cpu_count())
 
     if number_of_worker_selfplay >= 2:
         ray.init(num_cpus=number_of_worker_selfplay,
-                    num_gpus=torch.cuda.device_count(),
-                    include_dashboard=False)
+                 num_gpus=torch.cuda.device_count(),
+                 include_dashboard=False)
 
-    for ep in range(1, number_of_iteration+1):
+    for ep in range(1, number_of_iteration + 1):
 
         # # # reset the cache reward for every iteration
         cache_reward, cache_loss = [], []
         game = ray.get([
-                play_game_ray.remote(
+            play_game_ray.remote(
                 environment=gameplay,
                 model=muzero_model,
                 monte_carlo_tree_search=monte_carlo_tree_search,
                 number_of_monte_carlo_tree_search_simulation=number_of_mcts_simulation,
-                temperature=temperature_scheduler(number_of_iteration+1, ep, mode = tempererature_type))
+                temperature=temperature_scheduler(number_of_iteration + 1, ep, mode=tempererature_type))
             for _ in range(number_of_self_play_before_training)]) \
             if number_of_worker_selfplay >= 2 else \
-                [play_game(
+            [play_game(
                 environment=gameplay,
                 model=muzero_model,
                 monte_carlo_tree_search=monte_carlo_tree_search,
                 number_of_monte_carlo_tree_search_simulation=number_of_mcts_simulation,
-                temperature=temperature_scheduler(number_of_iteration+1, ep, mode = tempererature_type))
-            for _ in range(number_of_self_play_before_training)]
-                
-                
+                temperature=temperature_scheduler(number_of_iteration + 1, ep, mode=tempererature_type))
+                for _ in range(number_of_self_play_before_training)]
+
         for g in game:
             replay_buffer.save_game(g), cache_reward.append(sum(g.rewards))
 
         # # # sum the average reward of all self_play
-        reward.append(sum(cache_reward)/len(cache_reward))
+        reward.append(sum(cache_reward) / len(cache_reward))
 
         # # # save best model. self_play serve as dataset on performance to evaluate best model
         # can change this save condition to be cyclic with modular or anything else....
         # Bool condition
         model_save_condition = reward[-1] == max(reward)
-        if model_save_condition is True: 
-            print(" "*1000,end='\r')
-            print("save model with : ", reward[-1]," reward")
+        if model_save_condition is True:
+            print(" " * 1000, end='\r')
+            print("save model with : ", reward[-1], " reward")
         muzero_model.save_model(
-            directory="model_checkpoint", 
-            tag=model_tag_number, 
-            model_update_condition = model_save_condition )
-            
-            
+            directory="model_checkpoint",
+            tag=model_tag_number,
+            model_update_condition=model_save_condition)
+
         # # # train model from all game accumulate in the replay_buffer
         for _ in range(number_of_training_before_self_play):
-            new_priority , batch_game_position = muzero_model.train(replay_buffer.sample_batch())
-            replay_buffer.update_value(new_priority , batch_game_position)
+            new_priority, batch_game_position = muzero_model.train(replay_buffer.sample_batch())
+            replay_buffer.update_value(new_priority, batch_game_position)
             cache_loss.append(muzero_model.store_loss[-1][0])
-            
-        loss.append(sum(cache_loss)/len(cache_loss))
 
-        prompt_feedback = f'EPOCH {ep} || selfplay reward: {reward[-1]} || training loss: { loss[-1] }||'
+        loss.append(sum(cache_loss) / len(cache_loss))
+
+        prompt_feedback = f'EPOCH {ep} || selfplay reward: {reward[-1]} || training loss: {loss[-1]}||'
         epoch_pr.append(prompt_feedback)
-        if verbose: 
-            print(" "*1000,end='\r')
-            print(prompt_feedback,end='\r')
-    
-    configuration = {'number_of_iteration' : number_of_iteration,
-                     'number_of_self_play_before_training' : number_of_self_play_before_training,
-                     'number_of_training_before_self_play' : number_of_training_before_self_play,
-                     'number_of_mcts_simulation' : number_of_mcts_simulation,
-                     'model_tag_number' : model_tag_number,
-                     'number_of_worker_selfplay' : number_of_worker_selfplay,
-                     'tempererature_type' : tempererature_type,
-                     "verbose" : verbose}
+        if verbose:
+            print(" " * 1000, end='\r')
+            print(prompt_feedback, end='\r')
+
+    configuration = {'number_of_iteration': number_of_iteration,
+                     'number_of_self_play_before_training': number_of_self_play_before_training,
+                     'number_of_training_before_self_play': number_of_training_before_self_play,
+                     'number_of_mcts_simulation': number_of_mcts_simulation,
+                     'model_tag_number': model_tag_number,
+                     'number_of_worker_selfplay': number_of_worker_selfplay,
+                     'tempererature_type': tempererature_type,
+                     "verbose": verbose}
 
     return epoch_pr, loss, reward, configuration
+
 
 ##########################################################################################################################
 
@@ -299,7 +306,8 @@ def play_game_from_checkpoint(game_to_play='CartPole-v1',
                               slow_mo_in_second=0.0,
                               render=True,
                               verbose=True,
-                              benchmark=False):
+                              benchmark=False,
+                              render_mode=None):
     """
     Env/Game inference
     
@@ -324,7 +332,7 @@ def play_game_from_checkpoint(game_to_play='CartPole-v1',
         verbose (bool): Defaults to True.
         benchmark (bool: Defaults to False.
 
-    """    
+    """
 
     import random
     import time
@@ -344,31 +352,34 @@ def play_game_from_checkpoint(game_to_play='CartPole-v1',
         # env = gym.make(game_to_play)
         # env.render_mode = env.metadata["render_modes"][0]
         # those two are the generic render mode of gym env
-        try: env = gym.make(game_to_play, render_mode = 'human')
-        except: pass
-        try: env = gym.make(game_to_play, render_mode = "rgb_array")
-        except: raise Exception("No render_mode call human or rgb_array")
-    else: env = gym.make(game_to_play)
-    
-    try : env.seed(random.randint(0, 100000)) # set the random seed of gym env
-    except: pass
-    
+        if render_mode:
+            env = gym.make(game_to_play, render_mode=render_mode)
+        else:
+            raise Exception("No render_mode call human or rgb_array")
+    else:
+        env = gym.make(game_to_play, render_mode=None)
+
+    try:
+        env.seed(random.randint(0, 100000))  # set the random seed of gym env
+    except:
+        pass
+
     # # # initialize model class without initializing a neural network
     muzero = Muzero(load=True,
                     type_format=model_type)
-    
+
     # # # load save model with tag number
     muzero.load_model(tag=model_tag,
                       observation_space_dimensions=env.observation_space,
                       device=model_device)  # set device for model compute
-    
+
     # # # init the mcts class
     monte_carlo_tree_search = Monte_carlo_tree_search(pb_c_base=mcts_pb_c_base,
                                                       pb_c_init=mcts_pb_c_init,
                                                       discount=mcts_discount,
                                                       root_dirichlet_alpha=mcts_root_dirichlet_alpha,
                                                       root_exploration_fraction=mcts_root_exploration_fraction)
-    
+
     # # # create the game class with gameplay/record function
     gameplay = Game(env,
                     discount=gameplay_discount,
@@ -380,24 +391,24 @@ def play_game_from_checkpoint(game_to_play='CartPole-v1',
     sleep = slow_mo_in_second
     # # # number of simulation for the monte carlos tree search
     number_of_monte_carlo_tree_search_simulation = number_of_monte_carlo_tree_search_simulation
-    
+
     # # # temperature set to 0 will use argmax as policy (highest probability action)
     # # # over a temperature of 0.3 it will sample with the propability associate to the mouve
-    
+
     # # # number of iteration (mouve play during the game)
     game_iter = game_iter
 
     observation_reward_done_info = None
     reward_ls, action_ls, policy_ls = [], [], []
     for counter in range(game_iter):
-    # while not env.terminal: # the for loop is to bypass env terminal limit, else use while loop to follow rule of the env
+        # while not env.terminal: # the for loop is to bypass env terminal limit, else use while loop to follow rule of the env
 
         # # #laps time to see a slow motion of the env
         time.sleep(sleep)
         # # # start the game and get game initial observation / game return observation after action
         state = gameplay.observation(iteration=counter,
                                      feedback=observation_reward_done_info)
-        
+
         # render the env
         if render:
             gameplay.vision()
@@ -419,14 +430,14 @@ def play_game_from_checkpoint(game_to_play='CartPole-v1',
         # # # print the number of mouve, action and policy
         if verbose:
             print(
-                f"Mouve number: {counter+1} , Action: {muzero.action_dictionnary[action[np.argmax(policy/policy.sum())]]}, Policy: {policy/policy.sum()}")
+                f"Mouve number: {counter + 1} , Action: {muzero.action_dictionnary[action[np.argmax(policy / policy.sum())]]}, Policy: {policy / policy.sum()}")
 
         # that is ugly need to fix it
         if benchmark:
             reward_ls.append(sum(gameplay.rewards))
             action_ls.append(
-                muzero.action_dictionnary[action[np.argmax(policy/policy.sum())]])
-            policy_ls.append(policy/policy.sum())
+                muzero.action_dictionnary[action[np.argmax(policy / policy.sum())]])
+            policy_ls.append(policy / policy.sum())
         if gameplay.terminal or game_iter == counter:
             break
     gameplay.close()
@@ -463,7 +474,6 @@ def benchmark(model_tag, reward, action, policy, folder="report", verbose=False)
                 print(f"|Action: {a} |Policy: {b} | Mouve number: {c} |", file=f)
 
 
-
 def report(muzero, replay_buffer, epoch_pr, loss, reward, folder="report", verbose=False):
     # TODO: build interactive html report with plotly
     if not os.path.exists(folder):
@@ -474,7 +484,7 @@ def report(muzero, replay_buffer, epoch_pr, loss, reward, folder="report", verbo
     print(f"creating report at : | directory: {folder}/ | model tag: {q} |")
 
     with open(f'{folder}/model_{q}_data_of_parameter_weight_and_epoch.txt', "a+") as f:
-        
+
         print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||", file=f)
         print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||", file=f)
         print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||", file=f)
@@ -500,7 +510,7 @@ def report(muzero, replay_buffer, epoch_pr, loss, reward, folder="report", verbo
         print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||", file=f)
         print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||", file=f)
         print("|||||||||||||||||||||||||||Epoch History||||||||||||||||||||||||||", file=f)
-        if len(epoch_pr) > 0 :
+        if len(epoch_pr) > 0:
             for i in epoch_pr:
                 print(i, file=f)
 
@@ -527,7 +537,7 @@ def report(muzero, replay_buffer, epoch_pr, loss, reward, folder="report", verbo
         plt.figure()
 
     all_loss = np.array([[a.cpu().detach().numpy() for a in x[:]]
-                        for x in muzero.store_loss], dtype=np.float64)
+                         for x in muzero.store_loss], dtype=np.float64)
     fig, ax = plt.subplots()
     plt.plot(all_loss)
     plt.yscale('log')
@@ -544,103 +554,105 @@ def report(muzero, replay_buffer, epoch_pr, loss, reward, folder="report", verbo
         plt.figure()
 
 
-
-def generate_config_file(env = None,
-                         seed = None,
-                         muzero = None,
-                         replay_buffer = None,
-                         mcts = None,
-                         gameplay = None,
-                         learning_configuration = None,
-                         save_codebase = True):
-    
+def generate_config_file(env=None,
+                         seed=None,
+                         muzero=None,
+                         replay_buffer=None,
+                         mcts=None,
+                         gameplay=None,
+                         learning_configuration=None,
+                         save_codebase=True):
     import json
     import zipfile
     import os
-    
+
     list_holder = []
     if env != None:
-        dict_env = {"game" : {"env" : env.spec.id,
-                              "render" : env.spec.kwargs['render_mode']}
+        dict_env = {"game": {"env": env.spec.id,
+                             "render": env.spec.kwargs['render_mode']}
                     }
         list_holder.append(dict_env)
 
     if seed != None:
-        dict_seed = {"random_seed" : {"np_random_seed" : seed , 
-                                      "torch_manual_seed" : seed ,
-                                      "env_seed" : seed}
+        dict_seed = {"random_seed": {"np_random_seed": seed,
+                                     "torch_manual_seed": seed,
+                                     "env_seed": seed}
                      }
         list_holder.append(dict_seed)
 
     if muzero != None:
-        dict_model = {"muzero" : {"model_structure" : muzero.model_structure ,
-                                  "state_space_dimensions" : muzero.state_dimension,
-                                  "hidden_layer_dimensions" : muzero.hidden_layer_dimension,
-                                  "number_of_hidden_layer" : muzero.number_of_hidden_layer,
-                                  "k_hypothetical_steps": muzero.k_hypothetical_steps,
-                                  "optimizer" : muzero.opt,
-                                  "lr_scheduler" : muzero.sch,
-                                  "learning_rate": muzero.lr,
-                                  "loss_type": muzero.loss_type,
-                                  "num_of_epoch" : muzero.epoch,
-                                  "device" : muzero.device,
-                                  "load" : False,
-                                  "use_amp" : muzero.use_amp,
-                                  "scaler_on": False,
-                                  "bin_method" : muzero.bin_method,
-                                  "bin_decomposition_number" : muzero.bin_decomposition_number}
+        dict_model = {"muzero": {"model_structure": muzero.model_structure,
+                                 "state_space_dimensions": muzero.state_dimension,
+                                 "hidden_layer_dimensions": muzero.hidden_layer_dimension,
+                                 "number_of_hidden_layer": muzero.number_of_hidden_layer,
+                                 "k_hypothetical_steps": muzero.k_hypothetical_steps,
+                                 "optimizer": muzero.opt,
+                                 "lr_scheduler": muzero.sch,
+                                 "learning_rate": muzero.lr,
+                                 "loss_type": muzero.loss_type,
+                                 "num_of_epoch": muzero.epoch,
+                                 "device": muzero.device,
+                                 "load": False,
+                                 "use_amp": muzero.use_amp,
+                                 "scaler_on": False,
+                                 "bin_method": muzero.bin_method,
+                                 "bin_decomposition_number": muzero.bin_decomposition_number}
                       }
         list_holder.append(dict_model)
 
     if replay_buffer != None:
-        dict_buffer = {"replaybuffer" : {"window_size" : replay_buffer.window_size,
-                                         "batch_size" : replay_buffer.batch_size,
-                                         "td_steps" : replay_buffer.td_steps,
-                                         "game_sampling" : replay_buffer.game_sampling,
-                                         "position_sampling" : replay_buffer.position_sampling}}
+        dict_buffer = {"replaybuffer": {"window_size": replay_buffer.window_size,
+                                        "batch_size": replay_buffer.batch_size,
+                                        "td_steps": replay_buffer.td_steps,
+                                        "game_sampling": replay_buffer.game_sampling,
+                                        "position_sampling": replay_buffer.position_sampling}}
         list_holder.append(dict_buffer)
 
     if mcts != None:
-        dict_mcts = {"monte_carlo_tree_search" : {"pb_c_base" : mcts.pb_c_base , 
-                                                  "pb_c_init" : mcts.pb_c_init, 
-                                                  "discount" : mcts.discount, 
-                                                  "root_dirichlet_alpha" : mcts.root_dirichlet_alpha, 
-                                                  "root_exploration_fraction" : mcts.root_exploration_fraction}
-                    }
+        dict_mcts = {"monte_carlo_tree_search": {"pb_c_base": mcts.pb_c_base,
+                                                 "pb_c_init": mcts.pb_c_init,
+                                                 "discount": mcts.discount,
+                                                 "root_dirichlet_alpha": mcts.root_dirichlet_alpha,
+                                                 "root_exploration_fraction": mcts.root_exploration_fraction}
+                     }
         list_holder.append(dict_mcts)
-    
+
     if gameplay != None:
-        dict_gameplay = {"gameplay" : {"discount" : gameplay.discount,
-                                       "limit_of_game_play" : gameplay.limit_of_game_play}}
+        dict_gameplay = {"gameplay": {"discount": gameplay.discount,
+                                      "limit_of_game_play": gameplay.limit_of_game_play}}
         list_holder.append(dict_gameplay)
 
     if learning_configuration != None:
-        dict_lc = {"learning_cycle" : {"number_of_iteration" : learning_configuration['number_of_iteration'],
-                                       "number_of_self_play_before_training" : learning_configuration['number_of_self_play_before_training'],
-                                       "number_of_training_before_self_play" : learning_configuration['number_of_training_before_self_play'],
-                                       "number_of_mcts_simulation" : learning_configuration['number_of_mcts_simulation'] ,
-                                       "tempererature_type" : learning_configuration['tempererature_type'], 
-                                       "model_tag_number" : learning_configuration['model_tag_number'],
-                                       "verbose" : learning_configuration["verbose"],
-                                       "number_of_worker_selfplay": learning_configuration['number_of_worker_selfplay']}
+        dict_lc = {"learning_cycle": {"number_of_iteration": learning_configuration['number_of_iteration'],
+                                      "number_of_self_play_before_training": learning_configuration[
+                                          'number_of_self_play_before_training'],
+                                      "number_of_training_before_self_play": learning_configuration[
+                                          'number_of_training_before_self_play'],
+                                      "number_of_mcts_simulation": learning_configuration['number_of_mcts_simulation'],
+                                      "tempererature_type": learning_configuration['tempererature_type'],
+                                      "model_tag_number": learning_configuration['model_tag_number'],
+                                      "verbose": learning_configuration["verbose"],
+                                      "number_of_worker_selfplay": learning_configuration['number_of_worker_selfplay']}
                    }
         list_holder.append(dict_lc)
 
-    if not None in [muzero , mcts , gameplay , env , learning_configuration]:
-        dict_playgame = {"play_game_from_checkpoint":{"model_tag" : learning_configuration['model_tag_number'],
-                                                      "model_device" : muzero.device,
-                                                      "mcts_with_or_without_dirichlet_noise" : True,
-                                                      "number_of_monte_carlo_tree_search_simulation" : learning_configuration['number_of_mcts_simulation'],       
-                                                      "temperature" : 0,
-                                                      "game_iter" : gameplay.limit_of_game_play,
-                                                      "slow_mo_in_second" : 0.0,
-                                                      "render" : True if env.spec.kwargs['render_mode'] != None else False,
-                                                      "verbose" : True}
+    if not None in [muzero, mcts, gameplay, env, learning_configuration]:
+        dict_playgame = {"play_game_from_checkpoint": {"model_tag": learning_configuration['model_tag_number'],
+                                                       "model_device": muzero.device,
+                                                       "mcts_with_or_without_dirichlet_noise": True,
+                                                       "number_of_monte_carlo_tree_search_simulation":
+                                                           learning_configuration['number_of_mcts_simulation'],
+                                                       "temperature": 0,
+                                                       "game_iter": gameplay.limit_of_game_play,
+                                                       "slow_mo_in_second": 0.0,
+                                                       "render": True if env.spec.kwargs[
+                                                                             'render_mode'] != None else False,
+                                                       "verbose": True}
                          }
         list_holder.append(dict_playgame)
 
     if len(list_holder) != 0:
-        json_config = {k:v for d in tuple(list_holder) for k,v in d.items()}
+        json_config = {k: v for d in tuple(list_holder) for k, v in d.items()}
 
         if learning_configuration != None:
             with open(f"config/experiment_{learning_configuration['model_tag_number']}_config.json", "w") as f:
@@ -654,9 +666,6 @@ def generate_config_file(env = None,
                 zip_file.write(os.path.join(directory, filename), arcname=filename)
         zip_file.close()
 
-
-
-
 # # # benchmark speed
 # # import cProfile, pstats
 # # profiler = cProfile.Profile()
@@ -666,8 +675,6 @@ def generate_config_file(env = None,
 # # stats = pstats.Stats(profiler).sort_stats('cumtime')
 # # stats.print_stats()
 # # raise Exception("stop test")
-
-
 
 
 # # # hyperparameters tuning pseudo-code
