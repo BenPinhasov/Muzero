@@ -13,7 +13,7 @@ np.set_printoptions(threshold=np.inf)
 
 # # # set game environment from gym library
 # # # render_mode should be set to None if you don't want rgb observation
-env = gym.make("CartPole-v1", render_mode=None)
+env = gym.make("ALE/Pong-v5", render_mode=None, obs_type='ram')
 # # # if you want want rgb observation set render_mode to "rgb_array" , "human" or the render_mode rgb of our env
 # # # so for example if you want to use vision_model, you will have to change it
 # env = gym.make("ALE/Asterix-v5",render_mode='human')
@@ -40,7 +40,7 @@ muzero = Muzero(model_structure='mlp_model',
                 lr_scheduler="cosineannealinglr",  # learning rate scheduler
                 loss_type="general",  # muzero loss can be "general" or "game"
                 num_of_epoch=1000,  # number of step use by lr_scheduler
-                device="cpu",
+                device="cuda",
                 # device on which you want the compute to be made : "cpu" , "cuda" (it will auto scale on multi gpu or cpu for training and inference)
                 type_format=torch.float32,
                 # choice the dtype of the model. look at [https://pytorch.org/docs/1.8.1/amp.html#ops-that-can-autocast-to-float16]
@@ -94,7 +94,7 @@ epoch_pr, loss, reward, learning_config = learning_cycle(number_of_iteration=100
                                                          # "static_temperature" ,"linear_decrease_temperature" ,  "extreme_temperature" and "reversal_tanh_temperature"
                                                          verbose=True,
                                                          # if you want to print the epoch|reward|loss during train
-                                                         number_of_worker_selfplay=0,
+                                                         number_of_worker_selfplay=2,
                                                          # "max" will set the max amount of cpu core, 0 will make selflay run sequentially. Parallelize self-play on the number of worker
                                                          muzero_model=muzero,
                                                          gameplay=gameplay,

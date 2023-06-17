@@ -24,7 +24,7 @@ def play_game_ray(environment=None,
                   number_of_monte_carlo_tree_search_simulation=50,
                   temperature=1):
     environment = copy.deepcopy(environment)
-    if environment.env.metadata['render_fps'] is None:
+    if not hasattr(environment.env.metadata, 'render_fps') or environment.env.metadata['render_fps'] is None:
         environment.env.metadata['render_fps'] = 30
     counter = 0
     observation_reward_done_info = None
@@ -51,7 +51,7 @@ def play_game(environment=None,
               number_of_monte_carlo_tree_search_simulation=50,
               temperature=1):
     environment = copy.deepcopy(environment)
-    if environment.env.metadata['render_fps'] is None:
+    if not hasattr(environment.env.metadata, 'render_fps') or environment.env.metadata['render_fps'] is None:
         environment.env.metadata['render_fps'] = 30
     counter = 0
     observation_reward_done_info = None
